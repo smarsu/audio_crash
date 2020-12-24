@@ -52,22 +52,22 @@ class AudioConvert {
     fprintf(stderr, "channels ... %d, channel_layout ... %lu, sample_rate ... %d, sample_fmt ... %d, frame_size .. %d\n", 
         av_codec_ctx->channels, av_codec_ctx->channel_layout, av_codec_ctx->sample_rate, av_codec_ctx->sample_fmt, av_codec_ctx->frame_size);
 
-    // /// 2. Setup Swr
-    // swr_ctx = swr_alloc();
-    // if (!swr_ctx) {
-    //   return -5000;
-    // }
-    // av_opt_set_int(swr_ctx, "in_channel_count", av_codec_ctx->channels, 0);
-    // av_opt_set_int(swr_ctx, "out_channel_count", av_codec_ctx->channels, 0);
-    // av_opt_set_int(swr_ctx, "in_channel_layout", av_codec_ctx->channel_layout, 0);
-    // av_opt_set_int(swr_ctx, "out_channel_layout", av_codec_ctx->channel_layout, 0);
-    // av_opt_set_int(swr_ctx, "in_sample_rate", av_codec_ctx->sample_rate, 0);
-    // av_opt_set_int(swr_ctx, "out_sample_rate", av_codec_ctx->sample_rate, 0);
-    // av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", av_codec_ctx->sample_fmt, 0);
-    // av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", av_codec_ctx->sample_fmt, 0);
-    // if (swr_init(swr_ctx) < 0) {
-    //   return -6000;
-    // };
+    /// 2. Setup Swr
+    swr_ctx = swr_alloc();
+    if (!swr_ctx) {
+      return -5000;
+    }
+    av_opt_set_int(swr_ctx, "in_channel_count", av_codec_ctx->channels, 0);
+    av_opt_set_int(swr_ctx, "out_channel_count", av_codec_ctx->channels, 0);
+    av_opt_set_int(swr_ctx, "in_channel_layout", av_codec_ctx->channel_layout, 0);
+    av_opt_set_int(swr_ctx, "out_channel_layout", av_codec_ctx->channel_layout, 0);
+    av_opt_set_int(swr_ctx, "in_sample_rate", av_codec_ctx->sample_rate, 0);
+    av_opt_set_int(swr_ctx, "out_sample_rate", av_codec_ctx->sample_rate, 0);
+    av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", av_codec_ctx->sample_fmt, 0);
+    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", av_codec_ctx->sample_fmt, 0);
+    if (swr_init(swr_ctx) < 0) {
+      return -6000;
+    };
 
     /// 3. Setup Encoder
     if (avformat_alloc_output_context2(&output_av_format_ctx, nullptr, "mp4", output) < 0) {
@@ -129,7 +129,6 @@ class AudioConvert {
 
     /// 4. Alloc
     size_t size = sizeof(uint8_t *) * av_sample_fmt_is_planar(av_codec_ctx->sample_fmt) ? av_codec_ctx->channels : 1;
-    // buffer = reinterpret_cast<uint8_t **>(malloc(size));
     if (!buffer) {
       return -15000;
     }
@@ -146,8 +145,6 @@ class AudioConvert {
     encode_frame->format = output_av_codec_ctx->sample_fmt;
     encode_frame->channel_layout = output_av_codec_ctx->channel_layout;
     encode_frame->channels = output_av_codec_ctx->channels;
-
-    // FILE *fp_out = fopen(output, "a+");
 
     /// 5. Decode
     bool first = true;
@@ -166,44 +163,42 @@ class AudioConvert {
         }
         while (avcodec_receive_frame(av_codec_ctx, decode_frame) == 0) {
           nframes += decode_frame->nb_samples;
-        //   if (swr_convert(swr_ctx, nullptr, 0, const_cast<const uint8_t **>(decode_frame->data), decode_frame->nb_samples) != 0) {
-        //     return -18000;
-        //   }
-        // }
+          if (swr_convert(swr_ctx, nullptr, 0, const_cast<const uint8_t **>(decode_frame->data), decode_frame->nb_samples) != 0) {
+            return -18000;
+          }
+        }
 
-        // while (swr_get_out_samples(swr_ctx, 0) > audio_output_frame_size) {
-        //   int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
-        //   nsamples += samples;
+        while (swr_get_out_samples(swr_ctx, 0) > audio_output_frame_size) {
+          int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
+          nsamples += samples;
 
-        //   encode_frame->nb_samples = samples;
-        //   if (avcodec_fill_audio_frame(encode_frame, output_av_codec_ctx->channels, output_av_codec_ctx->sample_fmt, buffer[0], buffer_size, 0) < 0) {
-        //     return -19000;
-        //   }
+          encode_frame->nb_samples = samples;
+          if (avcodec_fill_audio_frame(encode_frame, output_av_codec_ctx->channels, output_av_codec_ctx->sample_fmt, buffer[0], buffer_size, 0) < 0) {
+            return -19000;
+          }
 
-          // AVPacket pkt;
-          // av_init_packet(&pkt);
+          AVPacket pkt;
+          av_init_packet(&pkt);
 
-          // if (avcodec_send_frame(output_av_codec_ctx, decode_frame) < 0) {
-          //   return -20000;
-          // }
-          // while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
-          //   // pkt.stream_index = output_av_stream->index;
-          //   // av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
+          if (avcodec_send_frame(output_av_codec_ctx, encode_frame) < 0) {
+            return -20000;
+          }
+          while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
+            pkt.stream_index = output_av_stream->index;
+            av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
 
-          //   // fwrite(pkt.data, 1, pkt.size, fp_out);
+            if (!first) {
+              if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
+                return -22000;
+              }
+            }
+            else {
+              fprintf(stderr, "pkt size ... %d\n", pkt.size);
+              first = false;
+            }
 
-          //   // if (!first) {
-          //   //   if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
-          //   //     return -22000;
-          //   //   }
-          //   // }
-          //   // else {
-          //   //   fprintf(stderr, "pkt size ... %d\n", pkt.size);
-          //   //   first = false;
-          //   // }
-
-          //   av_packet_unref(&pkt);
-          // }
+            av_packet_unref(&pkt);
+          }
         }
 
         c1++;
@@ -212,50 +207,47 @@ class AudioConvert {
       av_packet_unref(&input_packet);
     }
 
-    // int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
-    // nsamples += samples;
+    int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
+    nsamples += samples;
     
-    // if (samples > 0) {
-    //   encode_frame->nb_samples = samples;
-    //   if (avcodec_fill_audio_frame(encode_frame, output_av_codec_ctx->channels, output_av_codec_ctx->sample_fmt, buffer[0], buffer_size, 0) < 0) {
-    //     return -23000;
-    //   }
+    if (samples > 0) {
+      encode_frame->nb_samples = samples;
+      if (avcodec_fill_audio_frame(encode_frame, output_av_codec_ctx->channels, output_av_codec_ctx->sample_fmt, buffer[0], buffer_size, 0) < 0) {
+        return -23000;
+      }
 
-    //   AVPacket pkt;
-    //   av_init_packet(&pkt);
+      AVPacket pkt;
+      av_init_packet(&pkt);
 
-    //   if (avcodec_send_frame(output_av_codec_ctx, encode_frame) < 0) {
-    //     return -24000;
-    //   }
-    //   if (avcodec_send_frame(output_av_codec_ctx, nullptr) < 0) {
-    //     return -25000;
-    //   }
-    //   while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
-    //     pkt.stream_index = output_av_stream->index;
-    //     av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base);
+      if (avcodec_send_frame(output_av_codec_ctx, encode_frame) < 0) {
+        return -24000;
+      }
+      if (avcodec_send_frame(output_av_codec_ctx, nullptr) < 0) {
+        return -25000;
+      }
+      while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
+        pkt.stream_index = output_av_stream->index;
+        av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base);
         
-    //     // if (!first) {
-    //     //   if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
-    //     //     return -26000;
-    //     //   }
-    //     // }
-    //     // else {
-    //     //   fprintf(stderr, "pkt size ... %d\n", pkt.size);
-    //     //   first = false;
-    //     // }
+        if (!first) {
+          if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
+            return -26000;
+          }
+        }
+        else {
+          fprintf(stderr, "pkt size ... %d\n", pkt.size);
+          first = false;
+        }
 
-    //     av_packet_unref(&pkt);
-    //   }
-    //   av_packet_unref(&pkt);
-    // }
+        av_packet_unref(&pkt);
+      }
+    }
 
     fprintf(stderr, "c1 ... %d\n", c1);
     fprintf(stderr, "nframes ... %d\n", nframes);
     fprintf(stderr, "nsamples ... %d\n", nsamples);
 
     av_write_trailer(output_av_format_ctx);
-
-    // fclose(fp_out);
 
     auto t2 = time();
     fprintf(stderr, "AudioConvert Time ... %f ms\n", t2 - t1);
