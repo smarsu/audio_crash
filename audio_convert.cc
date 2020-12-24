@@ -39,9 +39,9 @@ class AudioConvert {
     }
     av_codec_ctx = avcodec_alloc_context3(nullptr);
     avcodec_parameters_to_context(av_codec_ctx, av_format_ctx->streams[stream_idx]->codecpar);
-    if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
-      return 1;  // It just AAC
-    }
+    // if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
+    //   return 1;  // It just AAC
+    // }
 
     if (avcodec_open2(av_codec_ctx, av_codec, nullptr) < 0) {
       return -4000;
@@ -68,20 +68,20 @@ class AudioConvert {
     // };
 
     /// 3. Setup Encoder
-    // if (avformat_alloc_output_context2(&output_av_format_ctx, nullptr, "mp4", output) < 0) {
-    //   return -7000;
-    // }
-    // if (output_av_format_ctx->oformat->audio_codec == AV_CODEC_ID_NONE) {
-    //   return -8000;
-    // }
+    if (avformat_alloc_output_context2(&output_av_format_ctx, nullptr, "mp4", output) < 0) {
+      return -7000;
+    }
+    if (output_av_format_ctx->oformat->audio_codec == AV_CODEC_ID_NONE) {
+      return -8000;
+    }
     output_av_codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
     if (!output_av_codec) {
       return -9000;
     }
-    // output_av_stream = avformat_new_stream(output_av_format_ctx, output_av_codec);
-    // if (!output_av_stream) {
-    //   return -10000;
-    // }
+    output_av_stream = avformat_new_stream(output_av_format_ctx, output_av_codec);
+    if (!output_av_stream) {
+      return -10000;
+    }
     output_av_codec_ctx = avcodec_alloc_context3(output_av_codec);
     if (!output_av_codec_ctx) {
       return -11000;
@@ -92,18 +92,17 @@ class AudioConvert {
     output_av_codec_ctx->channels = av_codec_ctx->channels;
     output_av_codec_ctx->channel_layout = av_codec_ctx->channel_layout;
 
-    // if (output_av_format_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
-    //   output_av_codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    // }
-    output_av_codec_ctx->flags |= AV_CODEC_FLAG2_LOCAL_HEADER;
+    if (output_av_format_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
+      output_av_codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+    }
 
     if (avcodec_open2(output_av_codec_ctx, output_av_codec, nullptr) < 0) {
       return -11000;
     }
 
-    // if (avcodec_parameters_from_context(output_av_stream->codecpar, output_av_codec_ctx) < 0) {
-    //   return -11100;
-    // }
+    if (avcodec_parameters_from_context(output_av_stream->codecpar, output_av_codec_ctx) < 0) {
+      return -11100;
+    }
 
     if (output_av_codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) {
       audio_output_frame_size = 1024;
@@ -113,18 +112,18 @@ class AudioConvert {
     }
     fprintf(stderr, "audio_output_frame_size ... %d\n", audio_output_frame_size);
 
-    // if (output_av_format_ctx->flags & AVFMT_NOFILE) {
-    //   return -12000;
-    // }
+    if (output_av_format_ctx->flags & AVFMT_NOFILE) {
+      return -12000;
+    }
 
-    // if (avio_open(&output_av_format_ctx->pb, output, AVIO_FLAG_WRITE) < 0) {
-    //   return -13000;
-    // }
-    // is_avio_open = true;
+    if (avio_open(&output_av_format_ctx->pb, output, AVIO_FLAG_WRITE) < 0) {
+      return -13000;
+    }
+    is_avio_open = true;
 
-    // if (avformat_write_header(output_av_format_ctx, nullptr) < 0) {
-    //   return -14000;
-    // }
+    if (avformat_write_header(output_av_format_ctx, nullptr) < 0) {
+      return -14000;
+    }
 
     /// 4. Alloc
     size_t size = sizeof(uint8_t *) * av_sample_fmt_is_planar(av_codec_ctx->sample_fmt) ? av_codec_ctx->channels : 1;
@@ -146,6 +145,8 @@ class AudioConvert {
     encode_frame->channel_layout = output_av_codec_ctx->channel_layout;
     encode_frame->channels = output_av_codec_ctx->channels;
 
+    // FILE *fp_out = fopen(output, "a+");
+
     /// 5. Decode
     bool first = true;
     int c1 = 0;
@@ -154,7 +155,7 @@ class AudioConvert {
     while (true) {
       AVPacket input_packet;
       if (av_read_frame(av_format_ctx, &input_packet) < 0) {
-        av_packet_unref(&input_packet);
+        // av_packet_unref(&input_packet);
         break;
       }
 
@@ -178,29 +179,31 @@ class AudioConvert {
         //     return -19000;
         //   }
 
-        //   AVPacket pkt;
-        //   av_init_packet(&pkt);
+          AVPacket pkt;
+          av_init_packet(&pkt);
 
-        //   if (avcodec_send_frame(output_av_codec_ctx, encode_frame) < 0) {
-        //     return -20000;
-        //   }
-        //   while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
-        //     pkt.stream_index = output_av_stream->index;
-        //     av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
+          if (avcodec_send_frame(output_av_codec_ctx, decode_frame) < 0) {
+            return -20000;
+          }
+          while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
+            // pkt.stream_index = output_av_stream->index;
+            // av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
 
-        //     // if (!first) {
-        //     //   if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
-        //     //     return -22000;
-        //     //   }
-        //     // }
-        //     // else {
-        //     //   fprintf(stderr, "pkt size ... %d\n", pkt.size);
-        //     //   first = false;
-        //     // }
+            // fwrite(pkt.data, 1, pkt.size, fp_out);
 
-        //     av_packet_unref(&pkt);
-        //   }
-        //   av_packet_unref(&pkt);
+            // if (!first) {
+            //   if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
+            //     return -22000;
+            //   }
+            // }
+            // else {
+            //   fprintf(stderr, "pkt size ... %d\n", pkt.size);
+            //   first = false;
+            // }
+
+            av_packet_unref(&pkt);
+          }
+          // av_packet_unref(&pkt);
         }
 
         c1++;
@@ -250,7 +253,9 @@ class AudioConvert {
     fprintf(stderr, "nframes ... %d\n", nframes);
     fprintf(stderr, "nsamples ... %d\n", nsamples);
 
-    // av_write_trailer(output_av_format_ctx);
+    av_write_trailer(output_av_format_ctx);
+
+    // fclose(fp_out);
 
     auto t2 = time();
     fprintf(stderr, "AudioConvert Time ... %f ms\n", t2 - t1);
