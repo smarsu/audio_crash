@@ -17,6 +17,8 @@ extern "C" {
   ANDROID_LOG_WARN, "audio_convert"
 #endif
 
+static uint8_t *buffer[64];
+
 class AudioConvert {
  public:
   AudioConvert() = default;
@@ -127,7 +129,7 @@ class AudioConvert {
 
     /// 4. Alloc
     size_t size = sizeof(uint8_t *) * av_sample_fmt_is_planar(av_codec_ctx->sample_fmt) ? av_codec_ctx->channels : 1;
-    buffer = reinterpret_cast<uint8_t **>(malloc(size));
+    // buffer = reinterpret_cast<uint8_t **>(malloc(size));
     if (!buffer) {
       return -15000;
     }
@@ -155,7 +157,6 @@ class AudioConvert {
     while (true) {
       AVPacket input_packet;
       if (av_read_frame(av_format_ctx, &input_packet) < 0) {
-        // av_packet_unref(&input_packet);
         break;
       }
 
@@ -179,31 +180,30 @@ class AudioConvert {
         //     return -19000;
         //   }
 
-          AVPacket pkt;
-          av_init_packet(&pkt);
+          // AVPacket pkt;
+          // av_init_packet(&pkt);
 
-          if (avcodec_send_frame(output_av_codec_ctx, decode_frame) < 0) {
-            return -20000;
-          }
-          while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
-            // pkt.stream_index = output_av_stream->index;
-            // av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
+          // if (avcodec_send_frame(output_av_codec_ctx, decode_frame) < 0) {
+          //   return -20000;
+          // }
+          // while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
+          //   // pkt.stream_index = output_av_stream->index;
+          //   // av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
 
-            // fwrite(pkt.data, 1, pkt.size, fp_out);
+          //   // fwrite(pkt.data, 1, pkt.size, fp_out);
 
-            // if (!first) {
-            //   if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
-            //     return -22000;
-            //   }
-            // }
-            // else {
-            //   fprintf(stderr, "pkt size ... %d\n", pkt.size);
-            //   first = false;
-            // }
+          //   // if (!first) {
+          //   //   if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
+          //   //     return -22000;
+          //   //   }
+          //   // }
+          //   // else {
+          //   //   fprintf(stderr, "pkt size ... %d\n", pkt.size);
+          //   //   first = false;
+          //   // }
 
-            av_packet_unref(&pkt);
-          }
-          // av_packet_unref(&pkt);
+          //   av_packet_unref(&pkt);
+          // }
         }
 
         c1++;
@@ -264,16 +264,16 @@ class AudioConvert {
   }
 
   ~AudioConvert() {
-    avcodec_free_context(&av_codec_ctx);
-    avcodec_free_context(&output_av_codec_ctx);
-    avformat_close_input(&av_format_ctx);
-    swr_free(&swr_ctx);
-    avformat_free_context(output_av_format_ctx);
-    if (is_avio_open) avio_close(output_av_format_ctx->pb);
-    if (is_av_alloc) av_freep(&buffer[0]);
-    free(buffer);
-    av_frame_free(&decode_frame);
-    av_frame_free(&encode_frame);
+    if (encode_frame) av_frame_free(&encode_frame);  // 142
+    if (decode_frame) av_frame_free(&decode_frame);  // 141
+    if (is_av_alloc) av_freep(&buffer[0]);  // 130
+    // if (buffer) free(buffer);  // 130
+    if (is_avio_open) avio_close(output_av_format_ctx->pb);  // 119
+    if (output_av_codec_ctx) avcodec_free_context(&output_av_codec_ctx);  // 85
+    if (output_av_format_ctx) avformat_free_context(output_av_format_ctx);  // 71
+    if (swr_ctx) swr_free(&swr_ctx);  // 54
+    if (av_codec_ctx) avcodec_free_context(&av_codec_ctx);  // 40
+    if (av_format_ctx) avformat_close_input(&av_format_ctx);  // 30
   }
 
  private:
@@ -283,7 +283,7 @@ class AudioConvert {
   AVCodecContext *av_codec_ctx{nullptr};
   AVFrame *decode_frame{nullptr};
   AVFrame *encode_frame{nullptr};
-  uint8_t **buffer{nullptr};
+  // uint8_t **buffer{nullptr};
   SwrContext *swr_ctx{nullptr};
   AVFormatContext *output_av_format_ctx{nullptr};
   AVCodec *output_av_codec{nullptr};
