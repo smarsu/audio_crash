@@ -312,7 +312,7 @@ class AudioCut {
 
 extern "C" __attribute__((visibility("default"))) __attribute__((used))
 int audio_cut(const char *input, const char *output, double start_ms, double end_ms) {
-  fprintf(stderr, "%s AudioCur ... %s, %s, %f, %f\n", VERSION, input, output, start_ms, end_ms);
+  fprintf(stderr, "%s AudioCut ... %s, %s, %f, %f\n", VERSION, input, output, start_ms, end_ms);
   AudioCut read;
   int ok = read.run(input, output, start_ms, end_ms);
   return ok;
