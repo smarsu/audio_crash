@@ -33,7 +33,7 @@ extern "C" {
 #include <android/log.h>
 #define fprintf __android_log_print
 #define stderr \
-  ANDROID_LOG_WARN, "audio_convert"
+  ANDROID_LOG_WARN, "audio_crash"
 #endif
 
 #define av_free_packet av_packet_unref
@@ -654,7 +654,9 @@ int to_thumbnail(const char *input_path, const char **output_paths, double *tms,
   fprintf(stderr, "input ... %s, output ... %s\n", input_path, output_paths[0]);
 #ifndef WITH_OMP
   VideoThubmnail video_thumbnail;
-  return video_thumbnail.run(input_path, output_paths, tms, tms_len, width, height, threshold);
+  int ok = video_thumbnail.run(input_path, output_paths, tms, tms_len, width, height, threshold);
+  fprintf(stderr, "video_thumbnail ok ... %d\n", ok);
+  return ok;
 #else 
   // int threads = get_cpu_num();
   // fprintf(stderr, "threads ... %d, tms_len ... %d\n", threads, tms_len);

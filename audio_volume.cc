@@ -14,7 +14,7 @@ extern "C" {
 #include <android/log.h>
 #define fprintf __android_log_print
 #define stderr \
-  ANDROID_LOG_WARN, "audio_volume"
+  ANDROID_LOG_WARN, "audio_crash"
 #endif
 
 void filter_frame_f(uint64_t *histogram, AVFrame *samples) {
@@ -373,6 +373,7 @@ int audio_volume(const char *input, const char *output, double volume) {
   fprintf(stderr, "%s AudioVolume ... %s, %s, %f\n", VERSION, input, output, volume);
   AudioVolume read;
   int ok = read.run(input, output, volume);
+  fprintf(stderr, "AudioVolume ok ... %d\n", ok);
   return ok;
 }
 

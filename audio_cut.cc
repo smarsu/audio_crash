@@ -14,7 +14,7 @@ extern "C" {
 #include <android/log.h>
 #define fprintf __android_log_print
 #define stderr \
-  ANDROID_LOG_WARN, "audio_cut"
+  ANDROID_LOG_WARN, "audio_crash"
 #endif
 
 int cut(uint8_t **dst, uint8_t **src, int src_start, int src_end, int start_nframes, int end_nframes, AVSampleFormat sample_fmt, int nb_channels) {
@@ -315,6 +315,7 @@ int audio_cut(const char *input, const char *output, double start_ms, double end
   fprintf(stderr, "%s AudioCut ... %s, %s, %f, %f\n", VERSION, input, output, start_ms, end_ms);
   AudioCut read;
   int ok = read.run(input, output, start_ms, end_ms);
+  fprintf(stderr, "AudioCut ok ... %d\n", ok);
   return ok;
 }
 

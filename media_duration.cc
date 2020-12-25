@@ -12,7 +12,7 @@ extern "C" {
 #include <android/log.h>
 #define fprintf __android_log_print
 #define stderr \
-  ANDROID_LOG_WARN, "media_duration"
+  ANDROID_LOG_WARN, "audio_crash"
 #endif
 
 static uint8_t *buffer[64];
@@ -48,6 +48,7 @@ int64_t media_duration(const char *input) {
   fprintf(stderr, "%s MediaDuration ... %s\n", VERSION, input);
   MediaDuration read;
   int64_t ok = read.run(input);
+  fprintf(stderr, "MediaDuration ok ... %d\n", ok);
   return ok;
 }
 

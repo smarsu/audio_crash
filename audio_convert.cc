@@ -14,7 +14,7 @@ extern "C" {
 #include <android/log.h>
 #define fprintf __android_log_print
 #define stderr \
-  ANDROID_LOG_WARN, "audio_convert"
+  ANDROID_LOG_WARN, "audio_crash"
 #endif
 
 static uint8_t *buffer[64];
@@ -284,6 +284,7 @@ int audio_convert(const char *input, const char *output) {
   fprintf(stderr, "%s AudioConvert ... %s, %s\n", VERSION, input, output);
   AudioConvert read;
   int ok = read.run(input, output);
+  fprintf(stderr, "AudioConvert ok ... %d\n", ok);
   return ok;
 }
 
