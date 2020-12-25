@@ -39,6 +39,7 @@ codesign -f -s "Apple Development: 754247874@qq.com" libaudio_crash.dylib
 cd ..
 
 cp build_ios/libaudio_crash.dylib ~/tencent/projects/flutter_audio_crash/ios/Classes/libaudio_crash.dylib
+cp build_ios/libaudio_crash.dylib /Users/smarsu/tencent/projects/video_editor_flutter/ios/Runner/frameworks/libaudio_crash.dylib
 
 rm -rf build_android
 mkdir -p build_android
