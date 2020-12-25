@@ -226,7 +226,8 @@ class AudioVolume {
 
       if (input_packet.stream_index == stream_idx) {
         if (avcodec_send_packet(av_codec_ctx, &input_packet)) {
-          return -17000;
+          av_packet_unref(&input_packet);
+          continue;
         }
         while (avcodec_receive_frame(av_codec_ctx, decode_frame) == 0) {
           filter_frame_f(histogram, decode_frame);

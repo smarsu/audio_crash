@@ -14,16 +14,36 @@ extern "C" {
 #include <android/log.h>
 #define fprintf __android_log_print
 #define stderr \
-  ANDROID_LOG_WARN, "audio_convert"
+  ANDROID_LOG_WARN, "audio_cut"
 #endif
+
+int cut(uint8_t **dst, uint8_t **src, int src_start, int src_end, int start_nframes, int end_nframes, AVSampleFormat sample_fmt, int nb_channels) {
+  int nb_samples = std::min(end_nframes, src_end) - std::max(start_nframes, src_start);
+  if (nb_samples <= 0) {
+    return 0;
+  }
+  int nb_offset = std::max(start_nframes - src_start, 0);
+  int nb_planes = nb_channels;
+  int plane;
+  
+  if (!av_sample_fmt_is_planar(static_cast<AVSampleFormat>(sample_fmt))) {
+    nb_samples *= nb_channels;
+    nb_offset *= nb_channels;
+    nb_planes = 1;
+  }
+  for (plane = 0; plane < nb_planes; ++plane) {
+    dst[plane] = src[plane] + nb_offset * av_get_bytes_per_sample(sample_fmt);
+  }
+  return nb_samples;
+}
 
 static uint8_t *buffer[64];
 
-class AudioConvert {
+class AudioCut {
  public:
-  AudioConvert() = default;
+  AudioCut() = default;
 
-  int run(const char *input, const char *output) {
+  int run(const char *input, const char *output, double start_ms, double end_ms) {
     auto t1 = time();
 
     /// 1. Setup Input
@@ -39,9 +59,6 @@ class AudioConvert {
     }
     av_codec_ctx = avcodec_alloc_context3(nullptr);
     avcodec_parameters_to_context(av_codec_ctx, av_format_ctx->streams[stream_idx]->codecpar);
-    if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
-      return 1;  // It just AAC
-    }
 
     if (avcodec_open2(av_codec_ctx, av_codec, nullptr) < 0) {
       return -4000;
@@ -49,6 +66,11 @@ class AudioConvert {
 
     fprintf(stderr, "channels ... %d, channel_layout ... %llu, sample_rate ... %d, sample_fmt ... %d, frame_size .. %d\n", 
         av_codec_ctx->channels, av_codec_ctx->channel_layout, av_codec_ctx->sample_rate, av_codec_ctx->sample_fmt, av_codec_ctx->frame_size);
+
+    int start_nframes = round(av_codec_ctx->sample_rate * start_ms / 1000);
+    int end_nframes = round(av_codec_ctx->sample_rate * end_ms / 1000);
+
+    fprintf(stderr, "start_nframes ... %d, end_nframes ... %d\n", start_nframes, end_nframes);
 
     /// 2. Setup Swr
     swr_ctx = swr_alloc();
@@ -141,9 +163,11 @@ class AudioConvert {
     encode_frame->channel_layout = output_av_codec_ctx->channel_layout;
     encode_frame->channels = output_av_codec_ctx->channels;
 
+    handle = reinterpret_cast<uint8_t **>(malloc(sizeof(uint8_t *) * 64));
+
     /// 5. Decode
     bool drop = true;  // Drop the first pkt.
-    int c1 = 0, nframes = 0, nsamples = 0;
+    int c1 = 0, nframes = 0, nsamples = 0, last_nframes = 0;
     while (true) {
       AVPacket input_packet;
       if (av_read_frame(av_format_ctx, &input_packet) < 0) {
@@ -152,12 +176,15 @@ class AudioConvert {
 
       if (input_packet.stream_index == stream_idx) {
         if (avcodec_send_packet(av_codec_ctx, &input_packet)) {
+          // May send Bad packet.       
           av_packet_unref(&input_packet);
           continue;
         }
         while (avcodec_receive_frame(av_codec_ctx, decode_frame) == 0) {
           nframes += decode_frame->nb_samples;
-          if (swr_convert(swr_ctx, nullptr, 0, const_cast<const uint8_t **>(decode_frame->data), decode_frame->nb_samples) != 0) {
+          int nb_samples = cut(handle, decode_frame->data, last_nframes, nframes, start_nframes, end_nframes, av_codec_ctx->sample_fmt, output_av_codec_ctx->channels);
+          last_nframes = nframes;
+          if (swr_convert(swr_ctx, nullptr, 0, const_cast<const uint8_t **>(handle), nb_samples) != 0) {
             return -18000;
           }
         }
@@ -245,12 +272,12 @@ class AudioConvert {
     }
 
     auto t2 = time();
-    fprintf(stderr, "AudioConvert Time ... %f ms\n", t2 - t1);
+    fprintf(stderr, "AudioCut Time ... %f ms\n", t2 - t1);
 
     return 0;
   }
 
-  ~AudioConvert() {
+  ~AudioCut() {
     if (encode_frame) av_frame_free(&encode_frame);  // 142
     if (decode_frame) av_frame_free(&decode_frame);  // 141
     if (is_av_alloc) av_freep(&buffer[0]);  // 130
@@ -260,6 +287,8 @@ class AudioConvert {
     if (swr_ctx) swr_free(&swr_ctx);  // 54
     if (av_codec_ctx) avcodec_free_context(&av_codec_ctx);  // 40
     if (av_format_ctx) avformat_close_input(&av_format_ctx);  // 30
+
+    if (handle) free(handle);
   }
 
  private:
@@ -277,31 +306,35 @@ class AudioConvert {
   int audio_output_frame_size{0};
   bool is_avio_open{false};
   bool is_av_alloc{false};
+
+  uint8_t **handle{nullptr};
 };
 
 extern "C" __attribute__((visibility("default"))) __attribute__((used))
-int audio_convert(const char *input, const char *output) {
-  fprintf(stderr, "%s AudioConvert ... %s, %s\n", VERSION, input, output);
-  AudioConvert read;
-  int ok = read.run(input, output);
+int audio_cut(const char *input, const char *output, double start_ms, double end_ms) {
+  fprintf(stderr, "%s AudioCur ... %s, %s, %f, %f\n", VERSION, input, output, start_ms, end_ms);
+  AudioCut read;
+  int ok = read.run(input, output, start_ms, end_ms);
   return ok;
 }
 
 #ifdef WITH_MAIN
 int main(int argv, char *args[]) {
-  if (argv != 4) {
-    fprintf(stderr, "Usage: %s <input> <output> <mod>\n", args[0]);
+  if (argv != 6) {
+    fprintf(stderr, "Usage: %s <input> <output> <start_ms> <end_ms> <mod>\n", args[0]);
     return -1;
   }
 
   const char *input = args[1];
   const char *output = args[2];
-  int mod = std::atoi(args[3]);
+  double start_ms = std::atof(args[3]);
+  double end_ms = std::atof(args[4]);
+  int mod = std::atoi(args[5]);
 
-  int ok = audio_convert(input, output);
+  int ok = audio_cut(input, output, start_ms, end_ms);
   fprintf(stderr, "ok ... %d\n", ok);
   while (mod) {
-    ok = audio_convert(input, output);
+    ok = audio_cut(input, output, start_ms, end_ms);
     fprintf(stderr, "ok ... %d\n", ok);
   }
 }
