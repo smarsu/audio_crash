@@ -1,6 +1,8 @@
 set -e
 set -x
 
+# ./build-ffmpeg.sh $1
+
 g++ -std=c++11 -O3 audio_convert.cc -o bin/audio_convert -DWITH_MAIN \
   -I /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/include \
   /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/lib/*.a
@@ -24,6 +26,19 @@ g++ -std=c++11 -O3 bleu.cc -o bin/bleu -DWITH_MAIN \
 g++ -std=c++11 -O3 video_thumbnail.cc -o bin/video_thumbnail -DWITH_MAIN \
   -I /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/include \
   /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/lib/*.a
+
+rm -rf build_ios
+mkdir -p build_ios
+cd build_ios
+
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../toolchain/iOS.cmake -DIOS_PLATFORM=OS -DCMAKE_OSX_ARCHITECTURES=$1 \
+  -DMACOSX_DEPLOYMENT_TARGET=8.0
+make -j 32
+
+codesign -f -s "Apple Development: 754247874@qq.com" libaudio_crash.dylib
+cd ..
+
+cp build_ios/libaudio_crash.dylib ~/tencent/projects/flutter_audio_crash/ios/Classes/libaudio_crash.dylib
 
 rm -rf build_android
 mkdir -p build_android
