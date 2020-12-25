@@ -369,7 +369,7 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used))
 int audio_volume(const char *input, const char *output, double volume) {
   // volume: [-0, -91]
   // ffmpeg -i <input> -filter_complex volumedetect -c:v copy -f null /dev/null 
-  fprintf(stderr, "%s AudioVolume ... %s, %s\n", VERSION, input, output);
+  fprintf(stderr, "%s AudioVolume ... %s, %s, %f\n", VERSION, input, output, volume);
   AudioVolume read;
   int ok = read.run(input, output, volume);
   return ok;

@@ -13,7 +13,7 @@ endif()
 include_directories(${FFMPEG_HOME}/include)
 link_directories(${FFMPEG_HOME}/lib)
 
-set(SRC audio_convert.cc audio_volume.cc)
+set(SRC audio_convert.cc audio_volume.cc media_duration.cc)
 
 if (IOS)
   add_library(audio_crash SHARED ${SRC})
