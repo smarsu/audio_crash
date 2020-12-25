@@ -24,8 +24,6 @@ class AudioConvert {
   AudioConvert() = default;
 
   int run(const char *input, const char *output) {
-    fprintf(stderr, "tr ... %lu\n", tr());
-
     auto t1 = time();
 
     /// 1. Setup Input
@@ -41,9 +39,9 @@ class AudioConvert {
     }
     av_codec_ctx = avcodec_alloc_context3(nullptr);
     avcodec_parameters_to_context(av_codec_ctx, av_format_ctx->streams[stream_idx]->codecpar);
-    // if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
-    //   return 1;  // It just AAC
-    // }
+    if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
+      return 1;  // It just AAC
+    }
 
     if (avcodec_open2(av_codec_ctx, av_codec, nullptr) < 0) {
       return -4000;
@@ -76,7 +74,7 @@ class AudioConvert {
     if (output_av_format_ctx->oformat->audio_codec == AV_CODEC_ID_NONE) {
       return -8000;
     }
-    output_av_codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
+    output_av_codec = avcodec_find_encoder(output_av_format_ctx->oformat->audio_codec);
     if (!output_av_codec) {
       return -9000;
     }
@@ -103,7 +101,7 @@ class AudioConvert {
     }
 
     if (avcodec_parameters_from_context(output_av_stream->codecpar, output_av_codec_ctx) < 0) {
-      return -11100;
+      return -12000;
     }
 
     if (output_av_codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) {
@@ -115,23 +113,20 @@ class AudioConvert {
     fprintf(stderr, "audio_output_frame_size ... %d\n", audio_output_frame_size);
 
     if (output_av_format_ctx->flags & AVFMT_NOFILE) {
-      return -12000;
+      return -13000;
     }
 
     if (avio_open(&output_av_format_ctx->pb, output, AVIO_FLAG_WRITE) < 0) {
-      return -13000;
+      return -14000;
     }
     is_avio_open = true;
 
     if (avformat_write_header(output_av_format_ctx, nullptr) < 0) {
-      return -14000;
+      return -15000;
     }
 
     /// 4. Alloc
     size_t size = sizeof(uint8_t *) * av_sample_fmt_is_planar(av_codec_ctx->sample_fmt) ? av_codec_ctx->channels : 1;
-    if (!buffer) {
-      return -15000;
-    }
     memset(buffer, 0, size);
     if (av_samples_alloc(buffer, nullptr, output_av_codec_ctx->channels, audio_output_frame_size, output_av_codec_ctx->sample_fmt, 0) < 0) {
       return -16000;
@@ -147,10 +142,8 @@ class AudioConvert {
     encode_frame->channels = output_av_codec_ctx->channels;
 
     /// 5. Decode
-    bool first = true;
-    int c1 = 0;
-    int nframes = 0;
-    int nsamples = 0;
+    bool drop = true;  // Drop the first pkt.
+    int c1 = 0, nframes = 0, nsamples = 0;
     while (true) {
       AVPacket input_packet;
       if (av_read_frame(av_format_ctx, &input_packet) < 0) {
@@ -187,14 +180,14 @@ class AudioConvert {
             pkt.stream_index = output_av_stream->index;
             av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base); 
 
-            if (!first) {
+            if (!drop) {
               if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
-                return -22000;
+                return -21000;
               }
             }
             else {
               fprintf(stderr, "pkt size ... %d\n", pkt.size);
-              first = false;
+              drop = false;
             }
 
             av_packet_unref(&pkt);
@@ -213,41 +206,42 @@ class AudioConvert {
     if (samples > 0) {
       encode_frame->nb_samples = samples;
       if (avcodec_fill_audio_frame(encode_frame, output_av_codec_ctx->channels, output_av_codec_ctx->sample_fmt, buffer[0], buffer_size, 0) < 0) {
-        return -23000;
+        return -22000;
       }
-
-      AVPacket pkt;
-      av_init_packet(&pkt);
 
       if (avcodec_send_frame(output_av_codec_ctx, encode_frame) < 0) {
-        return -24000;
-      }
-      if (avcodec_send_frame(output_av_codec_ctx, nullptr) < 0) {
-        return -25000;
-      }
-      while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
-        pkt.stream_index = output_av_stream->index;
-        av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base);
-        
-        if (!first) {
-          if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
-            return -26000;
-          }
-        }
-        else {
-          fprintf(stderr, "pkt size ... %d\n", pkt.size);
-          first = false;
-        }
-
-        av_packet_unref(&pkt);
+        return -23000;
       }
     }
 
-    fprintf(stderr, "c1 ... %d\n", c1);
-    fprintf(stderr, "nframes ... %d\n", nframes);
-    fprintf(stderr, "nsamples ... %d\n", nsamples);
+    AVPacket pkt;
+    av_init_packet(&pkt);
 
-    av_write_trailer(output_av_format_ctx);
+    if (avcodec_send_frame(output_av_codec_ctx, nullptr) < 0) {
+      return -24000;
+    }
+    while (avcodec_receive_packet(output_av_codec_ctx, &pkt) == 0) {
+      pkt.stream_index = output_av_stream->index;
+      av_packet_rescale_ts(&pkt, output_av_codec_ctx->time_base, output_av_stream->time_base);
+      
+      if (!drop) {
+        if (av_interleaved_write_frame(output_av_format_ctx, &pkt) < 0) {
+          return -25000;
+        }
+      }
+      else {
+        fprintf(stderr, "pkt size ... %d\n", pkt.size);
+        drop = false;
+      }
+
+      av_packet_unref(&pkt);
+    }
+
+    fprintf(stderr, "c1 ... %d, nframes ... %d, nsamples ... %d\n", c1, nframes, nsamples);
+
+    if (av_write_trailer(output_av_format_ctx) < 0) {
+      return -26000;
+    }
 
     auto t2 = time();
     fprintf(stderr, "AudioConvert Time ... %f ms\n", t2 - t1);
@@ -259,7 +253,6 @@ class AudioConvert {
     if (encode_frame) av_frame_free(&encode_frame);  // 142
     if (decode_frame) av_frame_free(&decode_frame);  // 141
     if (is_av_alloc) av_freep(&buffer[0]);  // 130
-    // if (buffer) free(buffer);  // 130
     if (is_avio_open) avio_close(output_av_format_ctx->pb);  // 119
     if (output_av_codec_ctx) avcodec_free_context(&output_av_codec_ctx);  // 85
     if (output_av_format_ctx) avformat_free_context(output_av_format_ctx);  // 71
@@ -275,7 +268,6 @@ class AudioConvert {
   AVCodecContext *av_codec_ctx{nullptr};
   AVFrame *decode_frame{nullptr};
   AVFrame *encode_frame{nullptr};
-  // uint8_t **buffer{nullptr};
   SwrContext *swr_ctx{nullptr};
   AVFormatContext *output_av_format_ctx{nullptr};
   AVCodec *output_av_codec{nullptr};
@@ -287,7 +279,7 @@ class AudioConvert {
 };
 
 extern "C" __attribute__((visibility("default"))) __attribute__((used))
-int audio_read(const char *input, const char *output) {
+int audio_convert(const char *input, const char *output) {
   fprintf(stderr, "%s AudioConvert ... %s, %s\n", VERSION, input, output);
   AudioConvert read;
   int ok = read.run(input, output);
@@ -305,10 +297,10 @@ int main(int argv, char *args[]) {
   const char *output = args[2];
   int mod = std::atoi(args[3]);
 
-  int ok = audio_read(input, output);
+  int ok = audio_convert(input, output);
   fprintf(stderr, "ok ... %d\n", ok);
   while (mod) {
-    ok = audio_read(input, output);
+    ok = audio_convert(input, output);
     fprintf(stderr, "ok ... %d\n", ok);
   }
 }
