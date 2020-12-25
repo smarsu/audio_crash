@@ -1,6 +1,6 @@
 // Copyright (c) 2020 smarsufan. All Rights Reserved.
 
-#define VERSION "0.0.18"
+#define VERSION "0.0.19"
 
 #include <sys/resource.h> 
 
