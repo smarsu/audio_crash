@@ -5,6 +5,10 @@ g++ -std=c++11 -O3 audio_convert.cc -o bin/audio_convert -DWITH_MAIN \
   -I /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/include \
   /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/lib/*.a
 
+g++ -std=c++11 -O3 audio_volume.cc -o bin/audio_volume -DWITH_MAIN \
+  -I /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/include \
+  /Users/smarsu/tencent/projects/audio_crash/FFmpeg/x86/lib/*.a
+
 rm -rf build_android
 mkdir -p build_android
 cd build_android
