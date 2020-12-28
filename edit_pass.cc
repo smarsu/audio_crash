@@ -7,23 +7,23 @@
 
 /// Word1 is Ground True
 /// Word2 is Pred.
-std::vector<std::tuple<int, int>> edit_pass(std::vector<int> word1, std::vector<int> word2) {
+std::vector<std::tuple<int, int, int>> edit_pass(std::vector<int> word1, std::vector<int> word2) {
   size_t size1 = word1.size();
   size_t size2 = word2.size();
   
   std::vector<std::vector<int>> dis_map(size1 + 1, std::vector<int>(size2 + 1, 0));
-  std::vector<std::vector<std::vector<std::tuple<int, int>>>> pass(size1 + 1, std::vector<std::vector<std::tuple<int, int>>>(size2 + 1));
+  std::vector<std::vector<std::vector<std::tuple<int, int, int>>>> pass(size1 + 1, std::vector<std::vector<std::tuple<int, int, int>>>(size2 + 1));
   dis_map[0][0] = 0;
   pass[0][0] = {};
   for (int i = 1; i < size2 + 1; ++i) {
     dis_map[0][i] = i;
     pass[0][i] = pass[0][i - 1];
-    pass[0][i].push_back(std::tuple<int, int>(-1, i - 1));  // insert
+    pass[0][i].push_back(std::tuple<int, int, int>(-1, i - 1, 0));  // insert
   }
   for (int j = 1; j < size1 + 1; ++j) {
     dis_map[j][0] = j;
     pass[j][0] = pass[j - 1][0];
-    pass[j][0].push_back(std::tuple<int, int>(-2, j - 1));  // remove
+    pass[j][0].push_back(std::tuple<int, int, int>(-2, j - 1, j - 1));  // remove
   }
   
   for (int i = 1; i < size1 + 1; ++i) {
@@ -37,16 +37,16 @@ std::vector<std::tuple<int, int>> edit_pass(std::vector<int> word1, std::vector<
 
       if (dis1 == dis_map[i][j]) {
         pass[i][j] = pass[i - 1][j];
-        pass[i][j].push_back(std::tuple<int, int>(-2, i - 1));  // insert
+        pass[i][j].push_back(std::tuple<int, int, int>(-2, i - 1, j - 1));  // insert
       }
       else if (dis2 == dis_map[i][j]) {
         pass[i][j] = pass[i][j - 1];
-        pass[i][j].push_back(std::tuple<int, int>(-1, j - 1));  // remove
+        pass[i][j].push_back(std::tuple<int, int, int>(-1, j - 1, j - 1));  // remove
       }
       else if (dis3 == dis_map[i][j]) {
         pass[i][j] = pass[i - 1][j - 1];
         if (word1[i - 1] != word2[j - 1]) {
-          pass[i][j].push_back(std::tuple<int, int>(i - 1, j - 1));
+          pass[i][j].push_back(std::tuple<int, int, int>(i - 1, j - 1, j - 1));
         }
       }
     }
@@ -63,6 +63,7 @@ int the_edit_pass(int *reference, int reference_size, int *hypothesis, int hypot
   for (auto &tuple : pass) {
     edit_pass_result[size++] = std::get<0>(tuple);
     edit_pass_result[size++] = std::get<1>(tuple);
+    edit_pass_result[size++] = std::get<2>(tuple);
   }
   return size;
 }
@@ -76,6 +77,7 @@ int main() {
   for (auto &p : pass) {
     int left = std::get<0>(p);
     int right = std::get<1>(p);
+    int pos = std::get<2>(p);
     std::string op;
     if (left == -1) {
       op = "remove";
