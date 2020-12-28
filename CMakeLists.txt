@@ -10,13 +10,13 @@ if (IOS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mios-version-min=${MACOSX_DEPLOYMENT_TARGET} -fembed-bitcode")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mios-version-min=${MACOSX_DEPLOYMENT_TARGET} -fembed-bitcode")
 elseif(ANDROID)
-  set(FFMPEG_HOME "/Users/smarsu/tencent/projects/audio_crash/FFmpeg/arm64")
+  set(FFMPEG_HOME "/Users/smarsu/tencent/projects/audio_crash/ffmpeg-4.2/arm64")
 endif()
 
 include_directories(${FFMPEG_HOME}/include)
 link_directories(${FFMPEG_HOME}/lib)
 
-set(SRC audio_convert.cc audio_volume.cc media_duration.cc audio_cut.cc bleu.cc video_thumbnail.cc)
+set(SRC audio_convert.cc audio_volume.cc media_duration.cc audio_cut.cc bleu.cc video_thumbnail.cc edit_pass.cc)
 
 if (IOS)
   add_library(audio_crash SHARED ${SRC})
