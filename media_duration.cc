@@ -48,7 +48,7 @@ int64_t media_duration(const char *input) {
   fprintf(stderr, "%s MediaDuration ... %s\n", VERSION, input);
   MediaDuration read;
   int64_t ok = read.run(input);
-  fprintf(stderr, "MediaDuration ok ... %d\n", ok);
+  fprintf(stderr, "MediaDuration ok ... %lld\n", ok);
   return ok;
 }
 

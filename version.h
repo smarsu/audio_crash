@@ -1,6 +1,6 @@
 // Copyright (c) 2020 smarsufan. All Rights Reserved.
 
-#define VERSION "0.0.24"
+#define VERSION "0.0.27"  // Add audio gradient Add smcc Use c++14
 
 #include <sys/resource.h> 
 

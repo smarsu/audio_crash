@@ -31,6 +31,12 @@ g++ -std=c++11 -O3 edit_pass.cc -o bin/edit_pass -DWITH_MAIN \
   -I /Users/smarsu/tencent/projects/audio_crash/ffmpeg-4.2/x86/include \
   /Users/smarsu/tencent/projects/audio_crash/ffmpeg-4.2/x86/lib/*.a
 
+g++ -std=c++11 -O3 audio_gradient.cc -o bin/audio_gradient -DWITH_MAIN \
+  -I /Users/smarsu/tencent/projects/audio_crash/ffmpeg-4.2/x86/include \
+  /Users/smarsu/tencent/projects/audio_crash/ffmpeg-4.2/x86/lib/*.a \
+  -I /Users/smarsu/tencent/projects/audio_crash/smcc/core \
+  /Users/smarsu/tencent/projects/audio_crash/smcc/build/core/libsmcc_core.a
+
 rm -rf build_ios
 mkdir -p build_ios
 cd build_ios
@@ -57,3 +63,4 @@ make -j 32
 cd ..
 
 cp build_android/libaudio_crash.a ~/tencent/projects/flutter_audio_crash/android/arm64/
+cp build_android/smcc/core/libsmcc_core.a ~/tencent/projects/flutter_audio_crash/android/arm64/

@@ -8,4 +8,6 @@ video/
 build_ios/
 scratch/
 thin/
+smcc/
+smcc
 
