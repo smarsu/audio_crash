@@ -22,7 +22,7 @@ add_subdirectory(smcc/core)
 set(SRC audio_convert.cc audio_volume.cc media_duration.cc audio_cut.cc bleu.cc video_thumbnail.cc edit_pass.cc audio_gradient.cc)
 
 if (IOS)
-  add_library(audio_crash SHARED ${SRC})
+  add_library(audio_crash STATIC ${SRC})
 elseif(ANDROID)
   add_library(audio_crash STATIC ${SRC})
 endif()
