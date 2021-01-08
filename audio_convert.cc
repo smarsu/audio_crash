@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "resample.h"
 #include "version.h"
 
 extern "C" {
@@ -39,9 +40,9 @@ class AudioConvert {
     }
     av_codec_ctx = avcodec_alloc_context3(nullptr);
     avcodec_parameters_to_context(av_codec_ctx, av_format_ctx->streams[stream_idx]->codecpar);
-    if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
-      return 1;  // It just AAC
-    }
+    // if (av_codec_ctx->codec_id == AV_CODEC_ID_AAC) {
+    //   return 1;  // It just AAC
+    // }
 
     if (avcodec_open2(av_codec_ctx, av_codec, nullptr) < 0) {
       return -4000;
@@ -51,21 +52,21 @@ class AudioConvert {
         av_codec_ctx->channels, av_codec_ctx->channel_layout, av_codec_ctx->sample_rate, av_codec_ctx->sample_fmt, av_codec_ctx->frame_size);
 
     /// 2. Setup Swr
-    swr_ctx = swr_alloc();
-    if (!swr_ctx) {
-      return -5000;
-    }
-    av_opt_set_int(swr_ctx, "in_channel_count", av_codec_ctx->channels, 0);
-    av_opt_set_int(swr_ctx, "out_channel_count", av_codec_ctx->channels, 0);
-    av_opt_set_int(swr_ctx, "in_channel_layout", av_codec_ctx->channel_layout, 0);
-    av_opt_set_int(swr_ctx, "out_channel_layout", av_codec_ctx->channel_layout, 0);
-    av_opt_set_int(swr_ctx, "in_sample_rate", av_codec_ctx->sample_rate, 0);
-    av_opt_set_int(swr_ctx, "out_sample_rate", av_codec_ctx->sample_rate, 0);
-    av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", av_codec_ctx->sample_fmt, 0);
-    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", av_codec_ctx->sample_fmt, 0);
-    if (swr_init(swr_ctx) < 0) {
-      return -6000;
-    };
+    // swr_ctx = swr_alloc();
+    // if (!swr_ctx) {
+    //   return -5000;
+    // }
+    // av_opt_set_int(swr_ctx, "in_channel_count", av_codec_ctx->channels, 0);
+    // av_opt_set_int(swr_ctx, "out_channel_count", av_codec_ctx->channels, 0);
+    // av_opt_set_int(swr_ctx, "in_channel_layout", av_codec_ctx->channel_layout, 0);
+    // av_opt_set_int(swr_ctx, "out_channel_layout", av_codec_ctx->channel_layout, 0);
+    // av_opt_set_int(swr_ctx, "in_sample_rate", av_codec_ctx->sample_rate, 0);
+    // av_opt_set_int(swr_ctx, "out_sample_rate", av_codec_ctx->sample_rate, 0);
+    // av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", av_codec_ctx->sample_fmt, 0);
+    // av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", av_codec_ctx->sample_fmt, 0);
+    // if (swr_init(swr_ctx) < 0) {
+    //   return -6000;
+    // };
 
     /// 3. Setup Encoder
     if (avformat_alloc_output_context2(&output_av_format_ctx, nullptr, "mp4", output) < 0) {
@@ -125,6 +126,8 @@ class AudioConvert {
       return -15000;
     }
 
+    AResample resample(output_av_codec_ctx->channels, output_av_codec_ctx->sample_fmt);
+
     /// 4. Alloc
     size_t size = sizeof(uint8_t *) * av_sample_fmt_is_planar(av_codec_ctx->sample_fmt) ? av_codec_ctx->channels : 1;
     memset(buffer, 0, size);
@@ -157,13 +160,18 @@ class AudioConvert {
         }
         while (avcodec_receive_frame(av_codec_ctx, decode_frame) == 0) {
           nframes += decode_frame->nb_samples;
-          if (swr_convert(swr_ctx, nullptr, 0, const_cast<const uint8_t **>(decode_frame->data), decode_frame->nb_samples) != 0) {
+          // if (swr_convert(swr_ctx, nullptr, 0, const_cast<const uint8_t **>(decode_frame->data), decode_frame->nb_samples) != 0) {
+          //   return -18000;
+          // }
+          if (resample.convert(nullptr, 0, decode_frame->data, decode_frame->nb_samples) != 0) {
             return -18000;
           }
         }
 
-        while (swr_get_out_samples(swr_ctx, 0) > audio_output_frame_size) {
-          int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
+        // while (swr_get_out_samples(swr_ctx, 0) > audio_output_frame_size) {
+        while (resample.get_out_samples(0) >= audio_output_frame_size) {
+          // int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
+          int samples = resample.convert(buffer, audio_output_frame_size, nullptr, 0);
           nsamples += samples;
 
           encode_frame->nb_samples = samples;
@@ -201,7 +209,8 @@ class AudioConvert {
       av_packet_unref(&input_packet);
     }
 
-    int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
+    // int samples = swr_convert(swr_ctx, buffer, audio_output_frame_size, nullptr, 0);
+    int samples = resample.convert(buffer, audio_output_frame_size, nullptr, 0);
     nsamples += samples;
     
     if (samples > 0) {
