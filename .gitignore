@@ -10,4 +10,6 @@ scratch/
 thin/
 smcc/
 smcc
+ffmpeg-4.2/x86/
+ffmpeg-4.2/arm64/
 
