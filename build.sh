@@ -45,11 +45,12 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=../toolchain/iOS.cmake -DIOS_PLATFORM=OS -DCMAKE
   -DMACOSX_DEPLOYMENT_TARGET=8.0
 make -j 32
 
-codesign -f -s "Apple Development: 754247874@qq.com" libaudio_crash.dylib
+# codesign -f -s "Apple Development: 754247874@qq.com" libaudio_crash.dylib
 cd ..
 
-cp build_ios/libaudio_crash.dylib ~/tencent/projects/flutter_audio_crash/ios/Classes/libaudio_crash.dylib
-cp build_ios/libaudio_crash.dylib /Users/smarsu/tencent/projects/video_editor_flutter/ios/Runner/frameworks/libaudio_crash.dylib
+cp build_ios/libaudio_crash.a /Users/smarsu/tencent/projects/flutter_audio_crash/ios/Vendored/
+# cp build_ios/libaudio_crash.dylib ~/tencent/projects/flutter_audio_crash/ios/Classes/libaudio_crash.dylib
+# cp build_ios/libaudio_crash.dylib /Users/smarsu/tencent/projects/video_editor_flutter/ios/Runner/frameworks/libaudio_crash.dylib
 
 rm -rf build_android
 mkdir -p build_android
