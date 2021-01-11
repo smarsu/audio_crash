@@ -1,7 +1,7 @@
 // Copyright (c) 2020 smarsufan. All Rights Reserved.
 
 #pragma once
-#define VERSION "0.0.31"  // Fix BuG of SMCC. Add #pragma once. SMCC support func call.
+#define VERSION "0.0.32"  // Support wav
 
 #include <sys/resource.h> 
 

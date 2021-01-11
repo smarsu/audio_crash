@@ -121,6 +121,9 @@ class AudioVolume {
     fprintf(stderr, "channels ... %d, channel_layout ... %llu, sample_rate ... %d, sample_fmt ... %d, frame_size .. %d\n", 
         av_codec_ctx->channels, av_codec_ctx->channel_layout, av_codec_ctx->sample_rate, av_codec_ctx->sample_fmt, av_codec_ctx->frame_size);
 
+    AVSampleFormat output_av_sample_format = AV_SAMPLE_FMT_FLTP;
+    uint64_t output_channel_layout = av_get_default_channel_layout(av_codec_ctx->channels);
+
     /// 2. Setup Swr
     swr_ctx = swr_alloc();
     if (!swr_ctx) {
@@ -129,11 +132,11 @@ class AudioVolume {
     av_opt_set_int(swr_ctx, "in_channel_count", av_codec_ctx->channels, 0);
     av_opt_set_int(swr_ctx, "out_channel_count", av_codec_ctx->channels, 0);
     av_opt_set_int(swr_ctx, "in_channel_layout", av_codec_ctx->channel_layout, 0);
-    av_opt_set_int(swr_ctx, "out_channel_layout", av_codec_ctx->channel_layout, 0);
+    av_opt_set_int(swr_ctx, "out_channel_layout", output_channel_layout, 0);
     av_opt_set_int(swr_ctx, "in_sample_rate", av_codec_ctx->sample_rate, 0);
     av_opt_set_int(swr_ctx, "out_sample_rate", av_codec_ctx->sample_rate, 0);
     av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", av_codec_ctx->sample_fmt, 0);
-    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", av_codec_ctx->sample_fmt, 0);
+    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", output_av_sample_format, 0);  // FLTP
     if (swr_init(swr_ctx) < 0) {
       return -6000;
     };
@@ -158,10 +161,10 @@ class AudioVolume {
       return -11000;
     }
 
-    output_av_codec_ctx->sample_fmt = av_codec_ctx->sample_fmt;
+    output_av_codec_ctx->sample_fmt = output_av_sample_format;
     output_av_codec_ctx->sample_rate = av_codec_ctx->sample_rate;
     output_av_codec_ctx->channels = av_codec_ctx->channels;
-    output_av_codec_ctx->channel_layout = av_codec_ctx->channel_layout;
+    output_av_codec_ctx->channel_layout = output_channel_layout;
 
     if (output_av_format_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
       output_av_codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
